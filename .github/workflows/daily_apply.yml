@@ -9,14 +9,16 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    # Node.js 24への強制移行を回避/対応するための環境変数設定（最新化）
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4 # 最新のv4を使用
 
       - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
+        uses: actions/setup-python@v5 # v4からv5にアップデート
 
       - name: Install dependencies
         run: |
