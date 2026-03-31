@@ -11,8 +11,8 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 # --- 設定（GitHub Secrets等を使う場合は os.environ.get を使用） ---
 LOGIN_URL = "https://www.adeccogroup.jp/login?serviceType=A&startURL=PO_MyTopA"
-USER_ID = os.environ.get("ADEKO_ID", "25629476")
-USER_PASS = os.environ.get("ADEKO_PASS", "TRNnqXLf9")
+USER_ID = os.environ.get("ADEKO_ID")
+USER_PASS = os.environ.get("ADEKO_PASS")
 
 # --- ブラウザ設定 ---
 opts = Options()
