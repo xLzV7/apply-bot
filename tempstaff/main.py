@@ -1,153 +1,200 @@
 import os
-import time
+import sys
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
-# --- 1. ブラウザ・環境設定 ---
-chrome_options = Options()
-chrome_options.add_argument('--headless')
-chrome_options.add_argument('--no-sandbox')
-chrome_options.add_argument('--disable-dev-shm-usage')
-chrome_options.add_argument('--disable-gpu')
-chrome_options.add_argument('--window-size=1920,1080')
+# ==========================================
+# 定数・設定
+# ==========================================
+LOGIN_URL = "https://www.tempstaff.co.jp/stmy/login?FROM_DISP_INFO=001&jcmy=GN01&ua=https%3A%2F%2Fwww.tempstaff.co.jp%2Fjbch%2Ftop"
 
-MY_ID = os.environ.get('TEMPSTAFF_ID')
+# 機密情報は必ず環境変数(GitHub Secrets)から取得する。コードへの直書き厳禁！
+USER_ID = os.environ.get('TEMPSTAFF_ID')
 PASSWORD = os.environ.get('TEMPSTAFF_PASS')
 
-if not MY_ID or not PASSWORD:
-    raise ValueError("Environment variables TEMPSTAFF_ID or TEMPSTAFF_PASS are not set.")
+if not USER_ID or not PASSWORD:
+    print("【致命的エラー】環境変数 'TEMPSTAFF_ID' または 'TEMPSTAFF_PASS' が設定されていません。")
+    print("GitHubの Settings > Secrets and variables > Actions にて設定してください。")
+    sys.exit(1)
 
-driver = webdriver.Chrome(options=chrome_options)
-wait = WebDriverWait(driver, 15)
+DEFAULT_WAIT_SEC = 20
 
-TARGET_URL = "https://www.tempstaff.co.jp/stmy/login?FROM_DISP_INFO=001&jcmy=GN01&ua=https%3A%2F%2Fwww.tempstaff.co.jp%2Fjbch%2Ftop"
+# ==========================================
+# 共通ヘルパー関数
+# ==========================================
+def wait_and_click(wait, by, selector):
+    wait.until(EC.element_to_be_clickable((by, selector))).click()
 
-try:
-    # --- 2. ログイン ---
-    driver.get(TARGET_URL)
-    wait.until(EC.presence_of_element_located((By.NAME, "myId"))).send_keys(MY_ID)
+def js_click(driver, element):
+    driver.execute_script("arguments[0].click();", element)
+
+def scroll_to_center(driver, element):
+    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+
+# ==========================================
+# メイン機能モジュール
+# ==========================================
+def setup_browser():
+    """GitHub Actions (Linux環境) 用のブラウザ設定"""
+    options = Options()
+    options.add_argument('--headless=new') # 画面なしモード（必須）
+    options.add_argument('--no-sandbox') # Linux環境でのエラー回避
+    options.add_argument('--disable-dev-shm-usage') # メモリ不足エラー回避
+    options.add_argument('--window-size=1920,1080') # 要素が見切れずにクリックできるように大きめに設定
+    
+    # Bot検知を回避するための標準的なUser-Agent設定
+    options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    
+    return webdriver.Chrome(options=options)
+
+def login(driver, wait):
+    print("--- ログイン開始 ---")
+    driver.get(LOGIN_URL)
+    wait.until(EC.presence_of_element_located((By.NAME, "myId"))).send_keys(USER_ID)
     driver.find_element(By.NAME, "password").send_keys(PASSWORD)
-    driver.find_element(By.XPATH, "//span[text()='ログインして仕事を探す']/ancestor::button").click()
-    
-    # --- 3. 検索条件設定 ---
-    wait.until(EC.presence_of_element_located((By.CLASS_NAME, "h1_pink")))
-    
-    # エリア（東京23区）
-    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "a.modal_work-location"))).click()
-    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "a[data-action*='selectChiki']"))).click()
-    wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "custom-select-trigger"))).click()
-    wait.until(EC.element_to_be_clickable((By.XPATH, "//li[@data-value='23' and text()='関東']"))).click()
-    wait.until(EC.element_to_be_clickable((By.XPATH, "//p[contains(text(), '東京都')]"))).click()
-    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "label[for='splitChiki_13_00001']"))).click()
-    
-    # 職種（事務）
-    wait.until(EC.element_to_be_clickable((By.ID, "addCondition"))).click()
-    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "a[data-formaction*='selectSyokusyu']"))).click()
-    wait.until(EC.element_to_be_clickable((By.XPATH, "//p[contains(text(), '事務')]"))).click()
-    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "label[for='0201']"))).click()
-    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "a.add_conditions"))).click()
-    
-    # 検索実行
-    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "a[data-formaction='/jbch/detailSearch']"))).click()
+    wait_and_click(wait, By.XPATH, "//span[text()='ログインして仕事を探す']/ancestor::button")
 
-    # 給与順
-    wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "custom-select-trigger"))).click()
-    wait.until(EC.element_to_be_clickable((By.XPATH, "//li[@data-value='002' and text()='給与順']"))).click()
-    time.sleep(3)
+def set_search_conditions(driver, wait):
+    print("--- 検索条件の設定 ---")
+    # エリア選択
+    wait_and_click(wait, By.CSS_SELECTOR, "a.modal_work-location")
+    wait_and_click(wait, By.CSS_SELECTOR, "a[data-action*='selectChiki']")
+    wait_and_click(wait, By.CLASS_NAME, "custom-select-trigger")
+    wait_and_click(wait, By.XPATH, "//li[@data-value='23' and text()='関東']")
+    wait_and_click(wait, By.XPATH, "//p[contains(@class, 'acc_title') and contains(text(), '東京都')]")
+    wait_and_click(wait, By.CSS_SELECTOR, "label[for='splitChiki_13_00001']")
+    
+    # 職種選択
+    wait_and_click(wait, By.ID, "addCondition")
+    wait_and_click(wait, By.CSS_SELECTOR, "a[data-formaction*='selectSyokusyu']")
+    wait_and_click(wait, By.XPATH, "//p[contains(@class, 'acc_title') and contains(text(), '事務')]")
+    wait_and_click(wait, By.CSS_SELECTOR, "label[for='0201']")
+    wait_and_click(wait, By.CSS_SELECTOR, "a.add_conditions")
+    
+    # 派遣選択
+    haken_checkbox = wait.until(EC.presence_of_element_located((By.ID, "employmentTypeList0")))
+    if not haken_checkbox.is_selected():
+        js_click(driver, haken_checkbox)
 
-    # --- 5. エントリー繰り返しループ ---
+def execute_search_and_sort(wait):
+    print("--- 検索実行と並べ替え ---")
+    wait_and_click(wait, By.CSS_SELECTOR, "a[data-formaction='/jbch/detailSearch']")
+    wait_and_click(wait, By.CLASS_NAME, "custom-select-trigger")
+    wait_and_click(wait, By.XPATH, "//li[@data-value='002' and text()='給与順']")
+
+def process_single_job(driver, wait, job_element, job_index, main_window):
+    scroll_to_center(driver, job_element)
+
+    icons = job_element.find_elements(By.CSS_SELECTOR, "ul.icon_list li")
+    is_haken = any("派遣" in icon.text for icon in icons)
+    if not is_haken:
+        print(f"案件 {job_index:03d}: 派遣ではないためスキップ")
+        return
+
+    entry_btns = job_element.find_elements(By.CSS_SELECTOR, "a.btn_pink01.entry")
+    if not entry_btns:
+        print(f"案件 {job_index:03d}: エントリー済みのためスキップ")
+        return
+
+    try:
+        js_click(driver, entry_btns[0])
+        wait.until(lambda d: len(d.window_handles) > 1)
+        driver.switch_to.window(driver.window_handles[-1])
+        
+        if "www.tempstaff.co.jp" not in driver.current_url:
+            print(f"案件 {job_index:03d}: 外部サイトのため即閉じ")
+            return
+
+        if "ただいま混み合っております" in driver.page_source:
+            print(f"案件 {job_index:03d}: サイト混雑エラー")
+            return
+
+        try:
+            submit_btn = WebDriverWait(driver, 2).until(
+                EC.element_to_be_clickable((By.XPATH, "//span[text()='エントリーする']/ancestor::button"))
+            )
+            js_click(driver, submit_btn)
+            
+            WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.XPATH, "//span[contains(text(), '完了') or contains(text(), '済み')]"))
+            )
+            print(f"案件 {job_index:03d}: ✨ エントリー成功")
+        except Exception:
+            print(f"案件 {job_index:03d}: 確定ボタン不在（詳細画面など）")
+
+    except Exception as e:
+        print(f"案件 {job_index:03d}: エラー発生 ({type(e).__name__})")
+        
+    finally:
+        if len(driver.window_handles) > 1:
+            driver.close()
+            driver.switch_to.window(main_window)
+
+def auto_entry_loop(driver, wait):
+    print("--- 自動エントリー処理開始 ---")
     main_window = driver.current_window_handle
     processed_count = 0
 
     while True:
-        # 求人カードのリストを取得
-        job_cards = driver.find_elements(By.CSS_SELECTOR, "div.job_list_box")
-        total_in_page = len(job_cards)
-        
-        if total_in_page == 0:
-            break
+        job_elements = driver.find_elements(By.CSS_SELECTOR, "li.jobInfo")
+        total_jobs = len(job_elements)
+        print(f"--- 走査中: 合計 {total_jobs} 件の求人を確認 (処理済: {processed_count} 件) ---")
 
-        for i in range(processed_count, total_in_page):
-            # 要素の再取得
-            job_cards = driver.find_elements(By.CSS_SELECTOR, "div.job_list_box")
-            if i >= len(job_cards): break
-            card = job_cards[i]
-
-            try:
-                # 1. 「派遣」アイコンのチェック
-                is_haken = any(icon.text == "派遣" for icon in card.find_elements(By.CLASS_NAME, "icon_gray"))
-                if not is_haken:
-                    print(f"案件 {i+1}: 派遣ではないためスキップ")
-                    processed_count += 1
-                    continue
-
-                # 2. ボタン状態のチェック
-                # ボタン要素を取得（エントリー or エントリー一覧）
-                btn = card.find_element(By.CSS_SELECTOR, "div.job_list_box_btn_box a")
-                btn_text = btn.text.strip()
-
-                if "エントリー一覧" in btn_text:
-                    print(f"案件 {i+1}: すでにエントリー済みです")
-                    processed_count += 1
-                    continue
+        if processed_count < total_jobs:
+            for i in range(processed_count, total_jobs):
+                current_jobs = driver.find_elements(By.CSS_SELECTOR, "li.jobInfo")
+                if i >= len(current_jobs):
+                    break
                 
-                if "エントリー" not in btn_text:
-                    print(f"案件 {i+1}: エントリー不可（{btn_text}）")
-                    processed_count += 1
-                    continue
+                target_job = current_jobs[i]
+                job_index = i + 1
+                
+                process_single_job(driver, wait, target_job, job_index, main_window)
+                processed_count = job_index
+                
+            continue
 
-                # 3. エントリー実行
-                for attempt in range(3):
-                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
-                    time.sleep(1)
-                    driver.execute_script("arguments[0].click();", btn)
-                    
-                    wait.until(lambda d: len(d.window_handles) > 1)
-                    driver.switch_to.window(driver.window_handles[-1])
-                    
-                    if "ただいま混み合っております" in driver.page_source:
-                        print(f"案件 {i+1}: 混雑リトライ ({attempt+1})")
-                        driver.close()
-                        driver.switch_to.window(main_window)
-                        time.sleep(3)
-                        continue
-                    
-                    try:
-                        short_wait = WebDriverWait(driver, 7)
-                        submit_btn = short_wait.until(EC.element_to_be_clickable((By.XPATH, "//span[text()='エントリーする']/ancestor::button")))
-                        driver.execute_script("arguments[0].click();", submit_btn)
-                        
-                        wait.until(EC.presence_of_element_located((By.XPATH, "//span[contains(text(), '完了') or contains(text(), '済み')]")))
-                        print(f"案件 {i+1}: エントリー完了")
-                    except:
-                        print(f"案件 {i+1}: スキップ（詳細画面にボタンなし）")
-                    
-                    break # アテンプト終了
-
-            except Exception as e:
-                print(f"案件 {i+1}: 処理エラー {type(e).__name__}")
-
-            # 後処理
-            if len(driver.window_handles) > 1:
-                driver.close()
-                driver.switch_to.window(main_window)
-            processed_count += 1
-
-        # --- もっと見る ---
         try:
-            read_more = driver.find_element(By.ID, "readMore")
-            if read_more.is_displayed():
-                driver.execute_script("arguments[0].click();", read_more)
-                wait.until(lambda d: len(d.find_elements(By.CSS_SELECTOR, "div.job_list_box")) > total_in_page)
+            read_more_btn = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.ID, "readMore"))
+            )
+            
+            if read_more_btn.is_displayed():
+                print(f"「もっと見る」をクリック（現在 {total_jobs} 件）")
+                scroll_to_center(driver, read_more_btn)
+                js_click(driver, read_more_btn)
+                wait.until(lambda d: len(d.find_elements(By.CSS_SELECTOR, "li.jobInfo")) > total_jobs)
             else:
+                print("「もっと見る」ボタンが非表示です。すべての案件を処理しました。")
                 break
-        except:
+        except Exception:
+            print("追加の案件はありません。処理を終了します。")
             break
 
-    print(f"全工程終了。処理件数: {processed_count}")
+    print(f"--- 全工程終了。最終処理件数: {processed_count} 件 ---")
 
-finally:
-    driver.quit()
+# ==========================================
+# 実行エントリーポイント
+# ==========================================
+def main():
+    print("ブラウザを起動しています...")
+    driver = setup_browser()
+    wait = WebDriverWait(driver, DEFAULT_WAIT_SEC)
+    
+    try:
+        login(driver, wait)
+        set_search_conditions(driver, wait)
+        execute_search_and_sort(wait)
+        auto_entry_loop(driver, wait)
+    except Exception as e:
+        print(f"予期せぬエラーが発生しました: {e}")
+        sys.exit(1) # GitHub ActionsのステータスをFailにするため
+    finally:
+        driver.quit() # メモリリーク防止のため確実にブラウザを閉じる
+        print("ブラウザを終了しました。")
+
+if __name__ == "__main__":
+    main()
