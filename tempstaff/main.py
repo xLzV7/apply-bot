@@ -151,10 +151,10 @@ def auto_entry_loop(driver, wait):
                 
                 target_job = current_jobs[i]
                 job_index = i + 1
-                
-                process_single_job(driver, wait, target_job, job_index, main_window)
+
                 processed_count = job_index
-                
+                process_single_job(driver, wait, target_job, job_index, main_window)
+
             continue
 
         try:
