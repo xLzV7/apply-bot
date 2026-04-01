@@ -26,6 +26,6 @@ jobs:
 
       - name: Run script
         env:
-          ADEKO_ID: ${{ secrets.ADEKO_ID }}
-          ADEKO_PASS: ${{ secrets.ADEKO_PASS }}
+          ADEKO_ID: ${{ secrets.ADECCO_ID }}
+          ADEKO_PASS: ${{ secrets.ADECCO_PASS }}
         run: python main.py
