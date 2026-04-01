@@ -11,7 +11,7 @@ from selenium.webdriver.chrome.options import Options
 # ==========================================
 LOGIN_URL = "https://www.tempstaff.co.jp/stmy/login?FROM_DISP_INFO=001&jcmy=GN01&ua=https%3A%2F%2Fwww.tempstaff.co.jp%2Fjbch%2Ftop"
 
-# 機密情報は必ず環境変数(GitHub Secrets)から取得する。コードへの直書き厳禁！
+# 機密情報は環境変数(GitHub Secrets)から取得する
 USER_ID = os.environ.get('TEMPSTAFF_ID')
 PASSWORD = os.environ.get('TEMPSTAFF_PASS')
 
@@ -66,9 +66,9 @@ def set_search_conditions(driver, wait):
     wait_and_click(wait, By.XPATH, "//li[@data-value='23' and text()='関東']")
     wait_and_click(wait, By.XPATH, "//p[contains(@class, 'acc_title') and contains(text(), '東京都')]")
     wait_and_click(wait, By.CSS_SELECTOR, "label[for='splitChiki_13_00001']")
+    wait_and_click(wait, By.ID, "addCondition")
     
     # 職種選択
-    wait_and_click(wait, By.ID, "addCondition")
     wait_and_click(wait, By.CSS_SELECTOR, "a[data-formaction*='selectSyokusyu']")
     wait_and_click(wait, By.XPATH, "//p[contains(@class, 'acc_title') and contains(text(), '事務')]")
     wait_and_click(wait, By.CSS_SELECTOR, "label[for='0201']")
