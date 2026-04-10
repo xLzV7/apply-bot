@@ -82,7 +82,8 @@ def setup_browser():
     opts.add_experimental_option("useAutomationExtension", False)
 
     service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=opts)
+    driver = webdriver.Chrome(options=opts)
+    # driver = webdriver.Chrome(service=service, options=opts)
     
     # navigator.webdriver を隠蔽
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
