@@ -18,11 +18,23 @@ jobs:
           python-version: '3.10'
       - name: Install dependencies
         run: pip install -r requirements.txt
+        
       - name: Run Adecco
         env:
           ADECCO_ID: ${{ secrets.ADECCO_ID }}
           ADECCO_PASS: ${{ secrets.ADECCO_PASS }}
         run: python adecco/main.py
+
+      # 💡 エラー時にスクリーンショットを保存（追加）
+      - name: Upload Error Screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adecco-error-evidence
+          path: |
+            error_screenshot.png
+            error_page.html
+          retention-days: 7
 
   # --- テンプスタッフ実行ジョブ ---
   run-tempstaff:
