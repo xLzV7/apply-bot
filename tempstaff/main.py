@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -25,14 +26,18 @@ DEFAULT_WAIT_SEC = 20
 # ==========================================
 # 共通ヘルパー関数
 # ==========================================
-def wait_and_click(wait, by, selector):
-    wait.until(EC.element_to_be_clickable((by, selector))).click()
-
 def js_click(driver, element):
     driver.execute_script("arguments[0].click();", element)
 
 def scroll_to_center(driver, element):
     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+
+def wait_and_click(driver, wait, by, selector):
+    """要素を画面中央にスクロールしてからJavaScriptでクリックする（安定化）"""
+    elm = wait.until(EC.presence_of_element_located((by, selector)))
+    scroll_to_center(driver, elm)
+    wait.until(EC.element_to_be_clickable((by, selector)))
+    js_click(driver, elm)
 
 # ==========================================
 # メイン機能モジュール
@@ -43,7 +48,7 @@ def setup_browser():
     options.add_argument('--headless=new') # 画面なしモード（必須）
     options.add_argument('--no-sandbox') # Linux環境でのエラー回避
     options.add_argument('--disable-dev-shm-usage') # メモリ不足エラー回避
-    options.add_argument('--window-size=1920,1080') # 要素が見切れずにクリックできるように大きめに設定
+    options.add_argument('--window-size=1920,1080') # 画面サイズをフルHDに拡張
     
     # Bot検知を回避するための標準的なUser-Agent設定
     options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
@@ -55,35 +60,45 @@ def login(driver, wait):
     driver.get(LOGIN_URL)
     wait.until(EC.presence_of_element_located((By.NAME, "myId"))).send_keys(USER_ID)
     driver.find_element(By.NAME, "password").send_keys(PASSWORD)
-    wait_and_click(wait, By.XPATH, "//span[text()='ログインして仕事を探す']/ancestor::button")
+    
+    login_btn = wait.until(EC.presence_of_element_located((By.XPATH, "//span[text()='ログインして仕事を探す']/ancestor::button")))
+    js_click(driver, login_btn)
 
 def set_search_conditions(driver, wait):
     print("--- 検索条件の設定 ---")
     # エリア選択
-    wait_and_click(wait, By.CSS_SELECTOR, "a.modal_work-location")
-    wait_and_click(wait, By.CSS_SELECTOR, "a[data-action*='selectChiki']")
-    wait_and_click(wait, By.CLASS_NAME, "custom-select-trigger")
-    wait_and_click(wait, By.XPATH, "//li[@data-value='23' and text()='関東']")
-    # wait_and_click(wait, By.XPATH, "//p[contains(@class, 'acc_title') and contains(text(), '愛知県')]")
-    wait_and_click(wait, By.CSS_SELECTOR, "label[for='sikucyoson_23_00012_23105']")
-    wait_and_click(wait, By.ID, "addCondition")
+    wait_and_click(driver, wait, By.CSS_SELECTOR, "a.modal_work-location")
+    time.sleep(1) # モーダルが開くのを待つ
+    
+    wait_and_click(driver, wait, By.CSS_SELECTOR, "a[data-action*='selectChiki']")
+    wait_and_click(driver, wait, By.CLASS_NAME, "custom-select-trigger")
+    wait_and_click(driver, wait, By.XPATH, "//li[@data-value='23' and text()='関東']")
+    wait_and_click(driver, wait, By.CSS_SELECTOR, "label[for='sikucyoson_23_00012_23105']")
+    wait_and_click(driver, wait, By.ID, "addCondition")
+    time.sleep(1) # モーダルが閉じるのを待つ
     
     # 職種選択
-    wait_and_click(wait, By.CSS_SELECTOR, "a[data-formaction*='selectSyokusyu']")
-    wait_and_click(wait, By.XPATH, "//p[contains(@class, 'acc_title') and contains(text(), '事務')]")
-    wait_and_click(wait, By.CSS_SELECTOR, "label[for='0201']")
-    wait_and_click(wait, By.CSS_SELECTOR, "a.add_conditions")
+    wait_and_click(driver, wait, By.CSS_SELECTOR, "a[data-formaction*='selectSyokusyu']")
+    time.sleep(1)
+    wait_and_click(driver, wait, By.XPATH, "//p[contains(@class, 'acc_title') and contains(text(), '事務')]")
+    wait_and_click(driver, wait, By.CSS_SELECTOR, "label[for='0201']")
+    wait_and_click(driver, wait, By.CSS_SELECTOR, "a.add_conditions")
+    time.sleep(1)
     
     # 派遣選択
     haken_checkbox = wait.until(EC.presence_of_element_located((By.ID, "employmentTypeList0")))
+    scroll_to_center(driver, haken_checkbox)
     if not haken_checkbox.is_selected():
         js_click(driver, haken_checkbox)
 
-def execute_search_and_sort(wait):
+def execute_search_and_sort(driver, wait):
     print("--- 検索実行と並べ替え ---")
-    wait_and_click(wait, By.CSS_SELECTOR, "a[data-formaction='/jbch/detailSearch']")
-    wait_and_click(wait, By.CLASS_NAME, "custom-select-trigger")
-    wait_and_click(wait, By.XPATH, "//li[@data-value='002' and text()='給与順']")
+    wait_and_click(driver, wait, By.CSS_SELECTOR, "a[data-formaction='/jbch/detailSearch']")
+    time.sleep(2) # 検索結果画面への遷移待ち
+    
+    wait_and_click(driver, wait, By.CLASS_NAME, "custom-select-trigger")
+    wait_and_click(driver, wait, By.XPATH, "//li[@data-value='002' and text()='給与順']")
+    time.sleep(2) # 並べ替え後の再読み込み待ち
 
 def process_single_job(driver, wait, job_element, job_index, main_window):
     scroll_to_center(driver, job_element)
@@ -186,14 +201,24 @@ def main():
     
     try:
         login(driver, wait)
+        time.sleep(3) # 💡 ログイン完了の画面遷移待ち
         set_search_conditions(driver, wait)
-        execute_search_and_sort(wait)
+        execute_search_and_sort(driver, wait)
         auto_entry_loop(driver, wait)
     except Exception as e:
-        print(f"予期せぬエラーが発生しました: {e}")
-        sys.exit(1) # GitHub ActionsのステータスをFailにするため
+        print(f"\n❌ 予期せぬエラーが発生しました: {e}")
+        # 💡 ここからデバッグ用の機能を追加
+        try:
+            driver.save_screenshot("tempstaff_error_screenshot.png")
+            with open("tempstaff_error_page.html", "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            print("📸 エラー時のスクリーンショットとHTMLを保存しました。Artifactsから確認してください。")
+        except Exception as save_err:
+            print(f"スクリーンショット保存中にエラー: {save_err}")
+        # 💡 ここまで
+        sys.exit(1) 
     finally:
-        driver.quit() # メモリリーク防止のため確実にブラウザを閉じる
+        driver.quit() 
         print("ブラウザを終了しました。")
 
 if __name__ == "__main__":
