@@ -25,7 +25,7 @@ jobs:
           ADECCO_PASS: ${{ secrets.ADECCO_PASS }}
         run: python adecco/main.py
 
-      # 💡 エラー時にスクリーンショットを保存（追加）
+      # 💡 アデコのエラー時にスクリーンショットを保存
       - name: Upload Error Screenshot
         if: failure()
         uses: actions/upload-artifact@v4
@@ -47,8 +47,20 @@ jobs:
           python-version: '3.10'
       - name: Install dependencies
         run: pip install -r requirements.txt
+        
       - name: Run Tempstaff
         env:
           TEMPSTAFF_ID: ${{ secrets.TEMPSTAFF_ID }}
           TEMPSTAFF_PASS: ${{ secrets.TEMPSTAFF_PASS }}
         run: python tempstaff/main.py
+
+      # 💡 テンプスタッフのエラー時にスクリーンショットを保存（追加）
+      - name: Upload Error Screenshot (Tempstaff)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tempstaff-error-evidence
+          path: |
+            tempstaff_error_screenshot.png
+            tempstaff_error_page.html
+          retention-days: 7
