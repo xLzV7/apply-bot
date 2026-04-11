@@ -62,9 +62,9 @@ def set_search_conditions(driver, wait):
     # エリア選択
     wait_and_click(wait, By.CSS_SELECTOR, "a.modal_work-location")
     wait_and_click(wait, By.CSS_SELECTOR, "a[data-action*='selectChiki']")
-    # wait_and_click(wait, By.CLASS_NAME, "custom-select-trigger")
-    # wait_and_click(wait, By.XPATH, "//li[@data-value='23' and text()='関東']")
-    wait_and_click(wait, By.XPATH, "//p[contains(@class, 'acc_title') and contains(text(), '愛知県')]")
+    wait_and_click(wait, By.CLASS_NAME, "custom-select-trigger")
+    wait_and_click(wait, By.XPATH, "//li[@data-value='23' and text()='関東']")
+    # wait_and_click(wait, By.XPATH, "//p[contains(@class, 'acc_title') and contains(text(), '愛知県')]")
     wait_and_click(wait, By.CSS_SELECTOR, "label[for='sikucyoson_23_00012_23105']")
     wait_and_click(wait, By.ID, "addCondition")
     
