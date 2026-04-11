@@ -73,7 +73,8 @@ def setup_browser():
     opts.add_argument("--headless=new")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
-    opts.add_argument("--window-size=1400,900")
+    # 💡 画面サイズをフルHDに広げて、要素が隠れるのを防ぐ
+    opts.add_argument("--window-size=1920,1080") 
     
     # Bot検知回避
     opts.add_argument("--disable-blink-features=AutomationControlled")
@@ -83,7 +84,6 @@ def setup_browser():
 
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(options=opts)
-    # driver = webdriver.Chrome(service=service, options=opts)
     
     # navigator.webdriver を隠蔽
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
@@ -271,16 +271,25 @@ def main():
     
     try:
         login(driver, wait)
+        time.sleep(3)  # 💡 ログイン後の画面遷移が完了するまで少し待機させる
         set_search_conditions(driver, wait)
         sort_by_hourly_wage(driver, wait)
         auto_entry_loop(driver, wait)
         
     except LimitReachedException as e:
-        # これは「正常な終了理由」なのでエラー扱いにしない
         print(f"\n✅ プロセス完了: {e}")
         sys.exit(0)
     except Exception as e:
         print(f"\n❌ 予期せぬエラーが発生しました: {e}")
+        # 💡 ここからデバッグ用の機能を追加
+        try:
+            driver.save_screenshot("error_screenshot.png")
+            with open("error_page.html", "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            print("📸 エラー時のスクリーンショットとHTMLを保存しました。Artifactsから確認してください。")
+        except Exception as save_err:
+            print(f"スクリーンショット保存中にエラー: {save_err}")
+        # 💡 ここまで
         sys.exit(1)
     finally:
         driver.quit()
